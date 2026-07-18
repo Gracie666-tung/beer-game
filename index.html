@@ -202,7 +202,7 @@ footer{margin-top:40px;color:var(--muted);font-size:12.5px;border-top:1px solid 
 
 <div class="wrap">
   <header class="masthead">
-    <div class="eyebrow">MIT Sloan · 1960s · Supply-Chain Simulation</div>
+    <div class="eyebrow">MIT Sloan · 1960s · Supply-Chain Simulation · v2.0 Finance View</div>
     <h1>啤酒供應鏈遊戲</h1>
     <div class="sub">The Beer Game — 經典供應鏈模擬。你管理四階供應鏈中的一站，
       每週只做一個決定：向上游訂多少箱啤酒。親手體驗 bullwhip effect（長鞭效應）怎麼把
@@ -289,6 +289,8 @@ footer{margin-top:40px;color:var(--muted);font-size:12.5px;border-top:1px solid 
         <div class="card spark-card">
           <h3>你的淨庫存走勢（庫存 − 欠單）</h3>
           <div id="spark"></div>
+          <div style="margin-top:6px;font-size:13px;color:var(--ink2)">
+            綁住的營運資金 <b class="mono" id="wc-live" style="color:var(--accent-deep)">—</b></div>
         </div>
         <div class="card" style="margin-top:12px">
           <h3 style="font-size:13px;color:var(--ink2);font-weight:600;margin-bottom:6px">最近 6 週紀錄</h3>
@@ -330,6 +332,28 @@ footer{margin-top:40px;color:var(--muted);font-size:12.5px;border-top:1px solid 
         <h3>長鞭放大倍率（訂單變異數 ÷ 顧客需求變異數）</h3>
         <div class="cnote">1.0 = 完全沒放大。經典結果：越靠上游、倍率越高。</div>
         <div class="hist-wrap bw-table"><table class="ledger" id="bw-table"></table></div>
+      </div>
+
+      <div class="chart-block">
+        <div class="eyebrow">Finance View · v2.0</div>
+        <h3 style="margin-top:4px">長鞭吃掉的營運資金（working capital）</h3>
+        <div class="cnote">每箱以成本 $10 計價、全鏈收款 DSO 4 週、付款 DPO 2 週（統一假設——只看資金佔用，不看毛利）。
+          基準線是「完美直通鏈」：每站每週剛好出貨等於顧客需求、庫存恆定 12 箱。</div>
+        <div class="verdict" style="margin:10px 0 6px">
+          <div><div class="vk">尖峰資金佔用</div><div class="money mono" id="fin-peak" style="font-size:clamp(24px,4vw,34px)">—</div></div>
+          <div><div class="vk">完美直通鏈基準</div><div class="money mono" id="fin-base" style="font-size:clamp(24px,4vw,34px)">—</div></div>
+          <div><div class="vk">長鞭多綁住的現金</div><div class="money mono" id="fin-extra" style="font-size:clamp(24px,4vw,34px);color:var(--bad)">—</div></div>
+        </div>
+        <div id="chart-wc"></div>
+        <div class="hist-wrap" style="margin-top:14px"><table class="ledger" id="fin-table"></table></div>
+        <div class="teach-grid" style="margin-top:12px">
+          <div class="teach-card"><h4>DIO — 庫存天期</h4>
+            <p>平均庫存 ÷ 平均每週出貨：一箱啤酒平均躺幾週才動。長鞭讓 DIO 暴衝，因為恐慌性補貨堆出短期用不掉的庫存。</p></div>
+          <div class="teach-card"><h4>CCC — 現金轉換循環</h4>
+            <p>CCC = DIO + DSO − DPO：從付錢給供應商、到收回下游貨款，現金被卡住的週數。CCC 越長，生意越大反而越缺現金。</p></div>
+          <div class="teach-card"><h4>怎麼跟 CFO 講</h4>
+            <p>庫存不是資產，是凍結的現金——多綁住的每一塊錢都要用融資成本養。壓下長鞭 = 釋放營運資金，等於一筆免費融資。這是供應鏈改善案最容易過財務那關的講法。</p></div>
+        </div>
       </div>
 
       <details class="datatable">
@@ -375,7 +399,8 @@ footer{margin-top:40px;color:var(--muted);font-size:12.5px;border-top:1px solid 
 
   <footer>
     規則依 MIT Beer Game 標準版：訂單延遲 2 週、運送 2 週；庫存 $0.5/箱·週、缺貨 $1.0/箱·週。
-    AI 訂貨採 Sterman (1989) anchoring-and-adjustment 模型。單機版 · 資料不離開瀏覽器。
+    AI 訂貨採 Sterman (1989) anchoring-and-adjustment 模型。
+    v2.0 財務視角：每箱成本 $10、DSO 4 週、DPO 2 週。單機版 · 資料不離開瀏覽器。
   </footer>
 </div>
 
@@ -473,6 +498,36 @@ function bullwhipRatios(g){
   return g.roles.map(r=>variance(r.hist.placed)/dv);
 }
 function totalCost(g){return g.roles.reduce((s,r)=>s+r.cost,0)}
+
+/* ---- finance layer (v2.0): derived entirely from history, gameplay untouched ----
+   uniform transfer price = unit cost $10 (capital tied up, not margin);
+   whole chain collects at DSO 4wk and pays at DPO 2wk */
+const UNIT_COST=10, DSO_W=4, DPO_W=2;
+function wcSeries(inv,shipped,arrived){
+  const out=[];
+  for(let t=0;t<inv.length;t++){
+    let ar=0; for(let k=Math.max(0,t-DSO_W+1);k<=t;k++) ar+=shipped[k];
+    let ap=0; for(let k=Math.max(0,t-DPO_W+1);k<=t;k++) ap+=arrived[k];
+    out.push(UNIT_COST*(inv[t]+ar-ap));
+  }
+  return out;
+}
+function financeMetrics(g){
+  const n=g.week;
+  const roles=g.roles.map(r=>{
+    const wc=wcSeries(r.hist.inv,r.hist.shipped,r.hist.arrived);
+    const avgInv=r.hist.inv.reduce((s,x)=>s+x,0)/n;
+    const avgShip=r.hist.shipped.reduce((s,x)=>s+x,0)/n;
+    const dio=avgShip>0?avgInv/avgShip:0;
+    return {wc,avgInv,dio,ccc:dio+DSO_W-DPO_W,peakWC:Math.max(...wc)};
+  });
+  const d=g.demand.slice(0,n);
+  // baseline: perfect pass-through chain — every station ships demand, inventory stays 12
+  const baseWC=wcSeries(d.map(()=>12),d,d).map(x=>4*x);
+  const teamWC=roles[0].wc.map((_,t)=>roles.reduce((s,r)=>s+r.wc[t],0));
+  return {roles,teamWC,baseWC,
+    peakTeam:Math.max(...teamWC),peakBase:Math.max(...baseWC)};
+}
 /* ================= ENGINE-END ================= */
 
 /* ================= UI ================= */
@@ -526,6 +581,7 @@ function show(name){
 
 /* ---- play rendering ---- */
 function money(x){return '$'+x.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1})}
+function money0(x){return '$'+Math.round(x).toLocaleString('en-US')}
 
 function renderPlay(){
   const me=G.roles[G.cfg.playerRole];
@@ -533,6 +589,8 @@ function renderPlay(){
   $('#sb-role').textContent=ROLE_NAMES[G.cfg.playerRole];
   $('#sb-cost').textContent=money(me.cost);
   renderBoard(); renderWorksheet(me); renderSpark(me); renderHistTable(me);
+  const wc=wcSeries(me.hist.inv,me.hist.shipped,me.hist.arrived);
+  $('#wc-live').textContent=money0(wc[wc.length-1]);
   const inp=$('#order-input'); inp.value=me.incoming; inp.focus(); inp.select();
 }
 
@@ -652,6 +710,20 @@ function renderEnd(){
       <td>${variance(r.hist.placed).toFixed(1)}</td><td><b>× ${bw[i].toFixed(1)}</b></td>
       <td>${Math.max(...r.hist.placed)}</td><td>${Math.max(...r.hist.backlog)}</td></tr>`).join('');
 
+  const fin=financeMetrics(G);
+  $('#fin-peak').textContent=money0(fin.peakTeam);
+  $('#fin-base').textContent=money0(fin.peakBase);
+  $('#fin-extra').textContent=money0(fin.peakTeam-fin.peakBase);
+  drawLineChart('chart-wc',{weeks,money:true,series:[
+    {name:'完美直通鏈（基準）',short:'基準',cls:'',dashed:true,values:fin.baseWC},
+    {name:'你們的供應鏈（四站合計）',short:'實際',cls:'s3',values:fin.teamWC}
+  ]});
+  $('#fin-table').innerHTML=
+    `<tr><th>站點</th><th>平均庫存（箱）</th><th>DIO（週）</th><th>CCC（週）</th><th>尖峰資金佔用</th></tr>`+
+    G.roles.map((r,i)=>`<tr><td>${ROLE_NAMES[i]}${i===G.cfg.playerRole?'（你）':''}</td>
+      <td>${fin.roles[i].avgInv.toFixed(1)}</td><td>${fin.roles[i].dio.toFixed(1)}</td>
+      <td><b>${fin.roles[i].ccc.toFixed(1)}</b></td><td>${money0(fin.roles[i].peakWC)}</td></tr>`).join('');
+
   let ft=`<tr><th>週</th><th>需求</th>`+ROLE_NAMES.map(n=>`<th>${n}下單</th><th>${n}淨庫存</th>`).join('')+'</tr>';
   for(let w=0;w<G.week;w++){
     ft+=`<tr><td>${w+1}</td><td>${G.demand[w]}</td>`+
@@ -673,7 +745,9 @@ function niceTicks(lo,hi,n){
 }
 function drawLineChart(mountId,cfg){
   const mount=document.getElementById(mountId);
-  const {weeks,series,unit,zeroLine}=cfg;
+  const {weeks,series,unit,zeroLine,money:isMoney}=cfg;
+  const fmtTick=t=>isMoney?('$'+(Math.abs(t)>=1000?(t/1000)+'k':t)):t;
+  const fmtVal=v=>isMoney?money0(v):v+(unit||'');
   const W=760,H=300,ML=44,MR=64,MT=14,MB=30;
   const all=series.flatMap(s=>s.values);
   let lo=Math.min(0,...all), hi=Math.max(...all,1);
@@ -687,7 +761,7 @@ function drawLineChart(mountId,cfg){
   for(const t of ticks){
     svg+=`<line x1="${ML}" x2="${W-MR}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)" stroke-width="1"/>
       <text x="${ML-7}" y="${Y(t)+3.5}" text-anchor="end" font-size="10.5"
-        font-family="var(--mono)" fill="var(--muted)">${t}</text>`;
+        font-family="var(--mono)" fill="var(--muted)">${fmtTick(t)}</text>`;
   }
   if(zeroLine&&lo<0) svg+=`<line x1="${ML}" x2="${W-MR}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--axis)" stroke-width="1.5"/>`;
   const xStep=Math.max(1,Math.ceil(n/9));
@@ -710,7 +784,7 @@ function drawLineChart(mountId,cfg){
       fill="${s.cls?'currentColor':'var(--muted)'}" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
   }
   // direct labels at line ends, nudged apart
-  const ends=series.map((s,k)=>({k,name:s.name,cls:s.cls,y:Y(s.values[s.values.length-1])}))
+  const ends=series.map((s,k)=>({k,name:s.short||s.name,cls:s.cls,y:Y(s.values[s.values.length-1])}))
     .sort((a,b)=>a.y-b.y);
   for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<13) ends[i].y=ends[i-1].y+13;
   for(const e of ends)
@@ -737,7 +811,7 @@ function drawLineChart(mountId,cfg){
     tip.innerHTML=`<div class="tw">第 ${weeks[i]} 週</div>`+series.map(s=>
       `<div class="tr"><span class="l"><span class="sw ${s.cls}"
         style="background:${s.cls?'currentColor':'var(--muted)'}"></span>${s.name}</span>
-        <span class="v">${s.values[i]}${unit||''}</span></div>`).join('');
+        <span class="v">${fmtVal(s.values[i])}</span></div>`).join('');
     tip.style.display='block';
     const box=mount.querySelector('.chart-mount').getBoundingClientRect();
     let tx=(clientX-box.left)+14;
