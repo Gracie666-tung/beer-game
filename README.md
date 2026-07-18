@@ -1,9 +1,26 @@
-# 啤酒供應鏈遊戲（The Beer Game）v2.0
+# 啤酒供應鏈遊戲（The Beer Game）v3.0
 
 單檔網頁版的 MIT Beer Game——四階供應鏈模擬（工廠 → 配銷商 → 大盤商 → 零售商），
 親手體驗 bullwhip effect（長鞭效應）。無任何依賴，開啟 `index.html` 即可玩。
 
 **線上版：https://gracie666-tung.github.io/beer-game/**
+
+## v3.0：闖關模式（不需要背景知識）
+
+課堂版 Beer Game 靠老師收尾 debrief；單機版把 facilitator 內建成教練「順伯」，
+用 progressive disclosure 一關教一個概念：
+
+| 關卡 | 場景 | 只教一件事 | 3★ 門檻 |
+|---|---|---|---|
+| 序章 | 頂下一間啤酒小舖（無延遲） | 庫存／欠單／成本 | ≤$60 |
+| 第 1 關 | 供應商搬去南部（lead time 4 週） | 在途訂單 supply line | ≤$50 |
+| 第 2 關 | 進入整條鏈當零售商 | bullwhip effect 現形 | ≤$100 |
+| 第 3 關 | 工廠生管 | 資訊斷裂的末端 | ≤$700 |
+| 第 4 關 | 大盤營運主管＋節慶需求 | 營運資金／CCC（CFO 徽章） | ≤$140 |
+| 自由模式 | 完整 sandbox | 全部選項開放 | — |
+
+星級門檻用模擬校準：「有紀律的 base-stock 玩家」拿得到 3★（自動化測試保證），
+「照需求訂」的普通玩家約 2★。進度存 localStorage。
 
 ## v2.0：Finance View（財務視角）
 
